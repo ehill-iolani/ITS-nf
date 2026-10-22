@@ -1,0 +1,1 @@
+placeholder -- staged as BUILD_REPORT's UNITE lineage-table input when --tax_db_source isn't unite; report.nf checks the staged filename to detect this case and skips --unite-taxmap
