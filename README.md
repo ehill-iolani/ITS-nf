@@ -100,8 +100,10 @@ group/site/etc. in the frontend. It has no effect on classification.
 | `--enable_read_stats` | `true` | Read length and Q-score summary before vs. after filtering; purely informational |
 | `--cluster_id` | `0.86` | vsearch identity threshold for read clustering |
 | `--min_cluster` | `5` | Minimum reads in a read-level cluster to attempt consensus |
+| `--spoa_max_reads` | `500` | Most reads per cluster used for the spoa draft, taken evenly through the cluster (`0` = all). RACON still polishes with every read, and `cluster_size` counts every read |
 | `--merge_id` | `0.97` | Identity at which per-cluster consensus sequences are merged; `0` skips the merge |
 | `--enable_medaka` | `false` | Use medaka-polished consensus instead of the racon consensus downstream |
+| `--blast_chunk_size` | `300` | Consensus sequences per `BLAST_TAX` task, so a sample with thousands of clusters is searched on several VMs side by side (`0` = one task per sample). The hits are the same either way |
 | `--min_pident` | `90` | Best hits below this %identity are flagged `low_identity`, not dropped |
 | `--min_qcov` | `70` | Best hits covering less than this % of the consensus (BLAST `qcovs`) are flagged `low_coverage`, not dropped; `0` = off |
 | `--tie_pident` | `1.0` | Hits within this many percentage points of the best identity count as tied (`tied_taxa`); `0` = exact ties only |
@@ -157,9 +159,9 @@ flowchart TD
 4. `CHOPPER` -- length/quality filter (`READ_STATS` side branch summarizes before vs. after)
 5. `CUTADAPT` -- primer trimming (skipped if no primers supplied, the default)
 6. `VSEARCH_CLUSTER` -- de novo identity clustering, both strands
-7. `SPOA_CONSENSUS`, `MINIMAP2_ALIGN` + `RACON` (+ optional `MEDAKA`) -- consensus per cluster
+7. `SPOA_CONSENSUS` (draft from at most `--spoa_max_reads` reads), `MINIMAP2_ALIGN` + `RACON` (+ optional `MEDAKA`) -- consensus per cluster
 8. `MERGE_CONSENSUS` -- folds near-identical cluster consensus sequences back together
-9. `BLAST_TAX` -- blastn per sample, up to 50 targets per cluster, with `qcovs`
+9. `BLAST_TAX` -- blastn per chunk of `--blast_chunk_size` consensus sequences, up to 50 targets per cluster, with `qcovs`; `BUILD_REPORT` joins each sample's chunks back into `07_taxonomy/{sample}.hits.tsv`
 10. `BUILD_REPORT` -- best hit, near-ties and flags per cluster; abundance table + QC summary; consensus fastas gathered by confidence
 11. `PCOA` -- Bray-Curtis distance + classical PCoA across samples, optionally joined with `--metadata`
 
