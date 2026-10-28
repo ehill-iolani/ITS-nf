@@ -31,9 +31,9 @@ process SPOA_CONSENSUS {
     // -l 1 (global alignment), not spoa's default local mode (-l 0): on ITS
     // clusters local mode built drafts about twice the read length (one
     // 566 bp cluster gave a 1,185 bp draft with the 5.8S in it twice), and
-    // racon keeps whatever length the draft has. Over one soil sample's 216
-    // clusters, drafts longer than every read in their cluster fell from 87
-    // to 5. BUILD_REPORT flags any that remain as long_consensus.
+    // racon keeps whatever length the draft has. In one soil sample, consensus
+    // sequences more than 50 bp longer than every read in their cluster fell
+    // from 87 clusters (14.2k reads) to 1 (21 reads).
     """
     . par_each.sh
 

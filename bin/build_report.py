@@ -179,13 +179,12 @@ def load_consensus_meta(paths):
     # consensus fasta headers are stamped by RACON/MEDAKA (and restamped by
     # MERGE_CONSENSUS) as:
     #   >{sample}_{cluster_id} sample={sample} cluster_size={n_reads} longest_read={bp}
-    # longest_read is missing from fastas made before v0.1.2 (a -resume), and
-    # those clusters are never flagged long_consensus
+    # longest_read is only there for checking draft length by hand; nothing
+    # here reads it
     rows = []
     for p in paths:
         with open(p) as fh:
             header = fh.readline().strip()
-            seq_len = sum(len(line.strip()) for line in fh)
         if not header.startswith(">"):
             continue
         tokens = header[1:].split()
@@ -196,15 +195,12 @@ def load_consensus_meta(paths):
             "seq_id": seq_id,
             "sample": fields.get("sample"),
             "cluster_size": int(fields["cluster_size"]) if "cluster_size" in fields else None,
-            "consensus_len": seq_len,
-            "longest_read": int(fields["longest_read"]) if "longest_read" in fields else None,
         })
-    return pd.DataFrame(rows, columns=["path", "seq_id", "sample", "cluster_size", "consensus_len", "longest_read"])
+    return pd.DataFrame(rows, columns=["path", "seq_id", "sample", "cluster_size"])
 
 
 # flag_reason -> the consensus_by_confidence/ folder a cluster's fasta goes in
-CONFIDENCE_DIR = {"": "confident", "low_identity": "low_confidence", "low_coverage": "low_confidence",
-                  "long_consensus": "low_confidence", "no_hit": "no_hit"}
+CONFIDENCE_DIR = {"": "confident", "low_identity": "low_confidence", "low_coverage": "low_confidence", "no_hit": "no_hit"}
 
 
 def sort_consensus(best, out_dir):
@@ -282,19 +278,14 @@ def main():
     # amplicon (qcovs < min-qcov -- typically a hit on the conserved 5.8S
     # alone), or for one too divergent to call with confidence
     # (pident < min-pident). Coverage is checked first: a short hit's identity
-    # says nothing about the rest of the sequence.
+    # says nothing about the rest of the sequence. A doubled draft (spoa's local
+    # mode, before v0.1.2) also lands here: BLAST matches only half of it.
     #
-    # Before both: a consensus longer than every read in its cluster
-    # (long_consensus). Each read is one whole amplicon, so that length can't be
-    # biological -- it's a draft that came out with a stretch repeated (spoa's
-    # local mode doubled the 5.8S, before v0.1.2), and BLAST can only match half
-    # of it, so its call would otherwise read as low_coverage. Checked against
-    # the longest read, not a multiple of the median: real ITS amplicons run
-    # ~420-825 bp across taxa and some clusters mix lengths.
+    # No flag for a consensus longer than its longest read (v0.1.2's
+    # long_consensus): with global-mode drafts that is POA noise of a few bp,
+    # and 80% of the clusters it caught were otherwise confident calls.
     best["flag_reason"] = ""
     best.loc[best["subject_id"] == "NO_HIT", "flag_reason"] = "no_hit"
-    too_long = best["longest_read"].notna() & (best["consensus_len"] > best["longest_read"])
-    best.loc[too_long & (best["flag_reason"] == ""), "flag_reason"] = "long_consensus"
     qcovs = pd.to_numeric(best["qcovs"], errors="coerce")
     low_qcov = qcovs.notna() & (qcovs < args.min_qcov)
     best.loc[low_qcov & (best["flag_reason"] == ""), "flag_reason"] = "low_coverage"
@@ -303,7 +294,7 @@ def main():
 
     # Thin support is a separate axis from the BLAST call above, so it gets its
     # own true/false column rather than another flag_reason value: flag_reason
-    # stays exactly '' | 'no_hit' | 'long_consensus' | 'low_coverage' | 'low_identity', which downstream readers
+    # stays exactly '' | 'no_hit' | 'low_coverage' | 'low_identity', which downstream readers
     # (e.g. the web frontend) take as the whole story and use as a taxon label.
     # Judged on the *merged* cluster size (reads from every cluster folded into
     # this one), so an organism split into several small read clusters isn't
@@ -343,8 +334,8 @@ def main():
     with open(args.out_html, "w") as fh:
         fh.write("<html><body><h2>Run summary</h2>")
         fh.write(f"<p>Clusters processed: {n_clusters}</p>")
-        fh.write(f"<p>Clusters flagged for manual review (no hit, consensus longer than its longest read, "
-                 f"query coverage &lt; {args.min_qcov:g}% or pident &lt; {args.min_pident}): {n_flagged}</p>")
+        fh.write(f"<p>Clusters flagged for manual review (no hit, query coverage &lt; {args.min_qcov:g}% "
+                 f"or pident &lt; {args.min_pident}): {n_flagged}</p>")
         cutoffs = []
         if args.min_abundance:
             cutoffs.append(f"&lt; {args.min_abundance} reads")

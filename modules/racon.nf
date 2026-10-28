@@ -29,9 +29,9 @@ process RACON {
         # racon always names the record "Consensus" and regenerates its own
         # description (LN:/RC:/XC: tags), discarding anything set upstream -- so
         # the sample/cluster-size header has to be stamped on here, after racon runs.
-        # longest_read lets BUILD_REPORT flag a consensus longer than every read
-        # it was built from (long_consensus): each read is one whole amplicon, so
-        # that length can only come from a bad draft. The first file (the
+        # longest_read is for checking draft length by hand: each read is one
+        # whole amplicon, so a consensus far longer than every read it was built
+        # from can only come from a bad draft. The first file (the
         # cluster's fastq, never empty) is read for the counts, the second stamped
         awk -v s="${sample}" -v c="\$cid" '
             FNR == NR { if (FNR % 4 == 2) { n++; if (length(\$0) > m) m = length(\$0) } next }
