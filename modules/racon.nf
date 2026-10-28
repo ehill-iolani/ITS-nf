@@ -28,11 +28,16 @@ process RACON {
 
         # racon always names the record "Consensus" and regenerates its own
         # description (LN:/RC:/XC: tags), discarding anything set upstream -- so
-        # the sample/cluster-size header has to be stamped on here, after racon runs
-        n_reads=\$(( \$(wc -l < "\$1") / 4 ))
-        awk -v s="${sample}" -v c="\$cid" -v n="\$n_reads" \\
-            'NR==1 { print ">" s "_" c " sample=" s " cluster_size=" n; next } { print }' \\
-            "\$cid.racon.raw" > "${sample}.\$cid.racon.fasta"
+        # the sample/cluster-size header has to be stamped on here, after racon runs.
+        # longest_read lets BUILD_REPORT flag a consensus longer than every read
+        # it was built from (long_consensus): each read is one whole amplicon, so
+        # that length can only come from a bad draft. The first file (the
+        # cluster's fastq, never empty) is read for the counts, the second stamped
+        awk -v s="${sample}" -v c="\$cid" '
+            FNR == NR { if (FNR % 4 == 2) { n++; if (length(\$0) > m) m = length(\$0) } next }
+            FNR == 1 { print ">" s "_" c " sample=" s " cluster_size=" n " longest_read=" m; next }
+            { print }
+        ' "\$1" "\$cid.racon.raw" > "${sample}.\$cid.racon.fasta"
         rm "\$cid.racon.raw"
     }
 

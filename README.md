@@ -16,6 +16,10 @@ steps are the same; what changes for ITS is:
   stretches, so a sequence from an organism missing from the reference can
   still hit something at high identity over the ~160 bp 5.8S alone. Hits
   covering under `--min_qcov` % of the consensus are flagged `low_coverage`.
+- **Consensus length.** spoa builds the draft in global mode (`-l 1`); its
+  default local mode doubled part of many ITS drafts. A consensus longer than
+  the longest read in its cluster can't be a real amplicon, and is flagged
+  `long_consensus`.
 - **Hit ranking.** The best hit is the highest-identity one that passes the
   coverage check, not the highest bitscore: UNITE's sequences differ in length,
   and bitscore favours longer references over closer ones.
@@ -174,7 +178,7 @@ results/
   blastdb/
   consensus_by_confidence/
     confident/                 passed the coverage and identity checks
-    low_confidence/            low_coverage or low_identity
+    low_confidence/            long_consensus, low_coverage or low_identity
     no_hit/                    no BLAST hit at all
   final_report/
     abundance_table.tsv        one row per cluster (see below)
@@ -187,7 +191,8 @@ results/
 `abundance_table.tsv` columns: `seq_id, sample, cluster_size, subject_id,
 pident, length, evalue, bitscore, qcovs, stitle, tied_taxa`, then (UNITE
 only) `kingdom, phylum, class, order, family, genus`, then `flag_reason`
-(`''`, `no_hit`, `low_coverage` or `low_identity`) and `low_abundance`.
+(`''`, `no_hit`, `long_consensus`, `low_coverage` or `low_identity`, checked
+in that order) and `low_abundance`.
 
 ## Testing
 

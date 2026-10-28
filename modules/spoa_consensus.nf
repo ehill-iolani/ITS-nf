@@ -27,6 +27,13 @@ process SPOA_CONSENSUS {
     // the read count: a 143k-read cluster took over 3 h, where a few hundred
     // reads already give a draft as good as racon needs. RACON still polishes
     // with every read, and cluster_size still counts every read.
+    //
+    // -l 1 (global alignment), not spoa's default local mode (-l 0): on ITS
+    // clusters local mode built drafts about twice the read length (one
+    // 566 bp cluster gave a 1,185 bp draft with the 5.8S in it twice), and
+    // racon keeps whatever length the draft has. Over one soil sample's 216
+    // clusters, drafts longer than every read in their cluster fell from 87
+    // to 5. BUILD_REPORT flags any that remain as long_consensus.
     """
     . par_each.sh
 
@@ -42,7 +49,7 @@ process SPOA_CONSENSUS {
             }
             NR % 4 == 2 && keep { print }
         ' "\$1" > "\$cid.reads.fasta"
-        spoa "\$cid.reads.fasta" -r 0 > "\$cid.draft.fasta"
+        spoa "\$cid.reads.fasta" -r 0 -l 1 >"\$cid.draft.fasta"
         rm "\$cid.reads.fasta"
     }
 

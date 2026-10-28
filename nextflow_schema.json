@@ -181,7 +181,7 @@
           "minimum": 0,
           "maximum": 100,
           "description": "BLAST %identity threshold for a confident call.",
-          "help_text": "Hits below this identity are flagged low_identity rather than dropped, and routed to consensus_by_confidence/low_confidence/ instead of confident/. Clusters with no BLAST hit at all are flagged no_hit. Also determines which clusters count as an identified taxon for the rarefaction curve and PCoA (flagged clusters are excluded from both)."
+          "help_text": "Hits below this identity are flagged low_identity rather than dropped, and routed to consensus_by_confidence/low_confidence/ instead of confident/. Clusters with no BLAST hit at all are flagged no_hit, and clusters whose consensus is longer than every read in the cluster (which no real amplicon can be) are flagged long_consensus. Also determines which clusters count as an identified taxon for the rarefaction curve and PCoA (flagged clusters are excluded from both)."
         },
         "min_qcov": {
           "type": "number",

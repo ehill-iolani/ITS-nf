@@ -27,10 +27,11 @@ process MEDAKA {
 
         # stamp the sample/cluster-size header on, same as RACON -- medaka renames
         # the record based on the racon draft's header rather than keeping it as-is
-        n_reads=\$(( \$(wc -l < "\$fq") / 4 ))
-        awk -v s="${sample}" -v c="\$cid" -v n="\$n_reads" \\
-            'NR==1 { print ">" s "_" c " sample=" s " cluster_size=" n; next } { print }' \\
-            "medaka_\$cid/consensus.fasta" > "${sample}.\$cid.medaka.consensus.fasta"
+        awk -v s="${sample}" -v c="\$cid" '
+            FNR == NR { if (FNR % 4 == 2) { n++; if (length(\$0) > m) m = length(\$0) } next }
+            FNR == 1 { print ">" s "_" c " sample=" s " cluster_size=" n " longest_read=" m; next }
+            { print }
+        ' "\$fq" "medaka_\$cid/consensus.fasta" > "${sample}.\$cid.medaka.consensus.fasta"
         rm -r "medaka_\$cid"
     done
     """

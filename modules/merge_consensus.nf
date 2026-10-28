@@ -31,16 +31,23 @@ process MERGE_CONSENSUS {
     # vsearch weights centroids by a ;size=N label annotation: turn the
     # stamped cluster_size=N into one (largest cluster becomes the centroid).
     # awk reads the files itself (not cat) so a file missing its trailing
-    # newline can't run its last line into the next file's header
+    # newline can't run its last line into the next file's header. Each
+    # cluster's longest_read goes aside to longest_read.tsv, for the restamp below
     awk '
         /^>/ {
             n = 1
-            for (i = 2; i <= NF; i++) if (\$i ~ /^cluster_size=/) n = substr(\$i, 14)
+            m = ""
+            for (i = 2; i <= NF; i++) {
+                if (\$i ~ /^cluster_size=/) n = substr(\$i, 14)
+                if (\$i ~ /^longest_read=/) m = substr(\$i, 14)
+            }
             print ">" substr(\$1, 2) ";size=" n
+            if (m != "") print substr(\$1, 2) "\\t" m > "longest_read.tsv"
             next
         }
         { print }
     ' ${consensus_fastas} > consensus.fasta
+    touch longest_read.tsv
 
     # --strand both: clusters were oriented to their own centroid, so two
     # fragments of the same species can still sit on opposite strands
@@ -53,25 +60,6 @@ process MERGE_CONSENSUS {
         --centroids centroids.fasta \\
         --uc merge.uc
 
-    # one fasta per merged group, restamped in the header format the rest of
-    # the pipeline reads (>{sample}_{cluster_id} sample={sample} cluster_size={n}),
-    # with cluster_size now the summed read count. sample-prefixed filenames
-    # because these get collected across samples in BUILD_REPORT
-    mkdir -p merged
-    awk -v s="${sample}" '
-        /^>/ {
-            if (out != "") close(out)
-            split(substr(\$0, 2), a, ";")
-            id = a[1]
-            size = a[2]
-            sub(/size=/, "", size)
-            out = "merged/" s "." substr(id, length(s) + 2) ".merged.fasta"
-            print ">" id " sample=" s " cluster_size=" size > out
-            next
-        }
-        { print > out }
-    ' centroids.fasta
-
     # which clusters were folded into which representative (S = centroid itself)
     printf 'member\\trepresentative\\n' > merge_map.tsv
     awk -F'\\t' '\$1 == "S" || \$1 == "H" {
@@ -79,6 +67,31 @@ process MERGE_CONSENSUS {
         t = (\$1 == "S") ? q : \$10; sub(/;.*/, "", t)
         print q "\\t" t
     }' merge.uc >> merge_map.tsv
+
+    # one fasta per merged group, restamped in the header format the rest of
+    # the pipeline reads (>{sample}_{cluster_id} sample={sample} cluster_size={n}
+    # longest_read={m}), with cluster_size now the summed read count and
+    # longest_read the longest over every member's reads. sample-prefixed
+    # filenames because these get collected across samples in BUILD_REPORT
+    mkdir -p merged
+    awk -F'\\t' -v s="${sample}" '
+        FILENAME == "longest_read.tsv" { longest[\$1] = \$2; next }
+        FILENAME == "merge_map.tsv" {
+            if (FNR > 1 && (\$1 in longest) && longest[\$1] + 0 > group[\$2] + 0) group[\$2] = longest[\$1]
+            next
+        }
+        /^>/ {
+            if (out != "") close(out)
+            split(substr(\$0, 2), a, ";")
+            id = a[1]
+            size = a[2]
+            sub(/size=/, "", size)
+            out = "merged/" s "." substr(id, length(s) + 2) ".merged.fasta"
+            print ">" id " sample=" s " cluster_size=" size ((id in group) ? " longest_read=" group[id] : "") > out
+            next
+        }
+        { print > out }
+    ' longest_read.tsv merge_map.tsv centroids.fasta
 
     echo "merged \$(grep -c '^>' consensus.fasta) cluster consensus sequences into \$(ls merged/*.merged.fasta | wc -l) at --merge_id ${params.merge_id}" >&2
     """
