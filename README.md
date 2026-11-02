@@ -57,6 +57,8 @@ genki_1,data/barcode02/*.fastq.gz
 merged per sample before filtering). Glob paths resolve relative to the
 launch directory, not the samplesheet's location. Reads may be in either
 orientation (e.g. native barcoding with your own ITS1/ITS4 PCR).
+Each row needs its own `sample` name (compared ignoring case): two rows with
+the same name stop the run at launch.
 
 The reference is chosen with `--tax_db_source`:
 
