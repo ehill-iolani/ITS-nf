@@ -104,7 +104,7 @@ group/site/etc. in the frontend. It has no effect on classification.
 | `--min_len` / `--max_len` / `--min_qual` | `300` / `1500` / `10` | chopper length/quality filtering thresholds, sized for ITS1/ITS4; narrow for ITS1- or ITS2-only primers |
 | `--enable_read_stats` | `true` | Read length and Q-score summary before vs. after filtering; purely informational |
 | `--cluster_id` | `0.86` | vsearch identity threshold for read clustering |
-| `--min_cluster` | `5` | Minimum reads in a read-level cluster to attempt consensus |
+| `--min_cluster` | `5` | Minimum reads in a read-level cluster to attempt consensus. A sample with no cluster this big (or no reads after filtering and trimming) is skipped and listed in `skipped_samples.tsv`, not a failed run |
 | `--spoa_max_reads` | `500` | Most reads per cluster used for the spoa draft, taken evenly through the cluster (`0` = all). RACON still polishes with every read, and `cluster_size` counts every read |
 | `--merge_id` | `0.97` | Identity at which per-cluster consensus sequences are merged; `0` skips the merge |
 | `--enable_medaka` | `false` | Use medaka-polished consensus instead of the racon consensus downstream |
@@ -163,8 +163,8 @@ flowchart TD
 3. `MERGE_FASTQ` -- merge multi-part fastq(.gz) files per sample
 4. `CHOPPER` -- length/quality filter (`READ_STATS` side branch summarizes before vs. after)
 5. `CUTADAPT` -- primer trimming (skipped if no primers supplied, the default)
-6. `VSEARCH_CLUSTER` -- de novo identity clustering, both strands
-7. `SPOA_CONSENSUS` (draft from at most `--spoa_max_reads` reads), `MINIMAP2_ALIGN` + `RACON` (+ optional `MEDAKA`) -- consensus per cluster
+6. `VSEARCH_CLUSTER` -- de novo identity clustering, both strands. A sample with nothing to cluster (an empty blank) is skipped with a warning and listed in `final_report/skipped_samples.tsv`; the run only stops if every sample is empty
+7. `SPOA_CONSENSUS` (draft from at most `--spoa_max_reads` reads), `MINIMAP2_ALIGN` + `RACON` (+ optional `MEDAKA`) -- consensus per cluster. A cluster none of whose reads aligned to its own draft (reads too short to place) is skipped with a warning and listed in `final_report/skipped_clusters.tsv`; the run only stops if no cluster in any sample could be polished
 8. `MERGE_CONSENSUS` -- folds near-identical cluster consensus sequences back together
 9. `BLAST_TAX` -- blastn per chunk of `--blast_chunk_size` consensus sequences, up to 50 targets per cluster, with `qcovs`; `BUILD_REPORT` joins each sample's chunks back into `07_taxonomy/{sample}.hits.tsv`
 10. `BUILD_REPORT` -- best hit, near-ties and flags per cluster; abundance table + QC summary; consensus fastas gathered by confidence
@@ -183,7 +183,9 @@ results/
     no_hit/                    no BLAST hit at all
   final_report/
     abundance_table.tsv        one row per cluster (see below)
-    run_qc_summary.html
+    run_qc_summary.html        cluster counts, per-sample flagged counts, skipped samples and clusters
+    skipped_samples.tsv        only if any: samples with nothing to cluster (sample, trimmed_reads, largest_cluster, reason `no_reads` / `no_cluster`)
+    skipped_clusters.tsv       only if any: clusters RACON could not polish (sample, cluster, reads, draft_length, reason `no_reads_aligned`); not in abundance_table.tsv
     read_qc_summary.html, read_stats.tsv, read_length_qscore_hist.tsv
     pcoa_coordinates.tsv
   pipeline_info/
